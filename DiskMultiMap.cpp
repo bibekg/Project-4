@@ -34,8 +34,12 @@ DiskMultiMap::~DiskMultiMap() {
     m_file.close();
 }
 
+// BOR: O(B), Actual: O(B)
 bool DiskMultiMap::createNew(const std::string& filename, unsigned int numBuckets) {
-    m_file.close();
+
+    if (m_file.isOpen())
+        m_file.close();
+    
     if(!m_file.createNew(filename))
         return false;   // return false if failed
     
@@ -45,10 +49,15 @@ bool DiskMultiMap::createNew(const std::string& filename, unsigned int numBucket
     h.bucketsUsed = 0;
     m_file.write(h, 0);
     
-    // Create B buckets
+    // Create #numBuckets buckets
+    // Runs in O(numBuckets) time
     for (int i = 0; i < numBuckets; i++) {
         Bucket b;
         b.used = false;
+        if (i != numBuckets - 1)
+            b.next = m_file.fileLength() + BUCKET_SIZE;
+        else
+            b.next = -1;        // last bucket, no next bucket
         
         // Write bucket at the end of the file
         m_file.write(b, m_file.fileLength());
@@ -57,7 +66,17 @@ bool DiskMultiMap::createNew(const std::string& filename, unsigned int numBucket
     return true;
 }
 
+// BOR: O(1), Actual: O(1)
 bool DiskMultiMap::openExisting(const std::string& filename) {
+    
+    if (m_file.isOpen())
+        m_file.close();
+    
+    if (!m_file.openExisting(filename)) // failed to open
+        return false;
+    
+    
+    
     return true;
 }
 
