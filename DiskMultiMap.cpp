@@ -36,7 +36,6 @@ DiskMultiMap::~DiskMultiMap() {
 
 // BOR: O(B), Actual: O(B)
 bool DiskMultiMap::createNew(const std::string& filename, unsigned int numBuckets) {
-
     if (m_file.isOpen())
         m_file.close();
     
@@ -68,20 +67,19 @@ bool DiskMultiMap::createNew(const std::string& filename, unsigned int numBucket
 
 // BOR: O(1), Actual: O(1)
 bool DiskMultiMap::openExisting(const std::string& filename) {
-    
     if (m_file.isOpen())
         m_file.close();
     
-    if (!m_file.openExisting(filename)) // failed to open
+    if (!m_file.openExisting(filename)) // failed to find file
         return false;
-    
-    
-    
+
+    m_filename = filename;
     return true;
 }
 
 void DiskMultiMap::close() {
-    
+    m_file.close();
+    m_filename.clear();
 }
 
 bool DiskMultiMap::insert(const std::string& key, const std::string& value, const std::string& context) {

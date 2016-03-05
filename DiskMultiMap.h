@@ -32,11 +32,12 @@ public:
     int erase(const std::string& key, const std::string& value, const std::string& context);
     
 private:
-    BinaryFile m_file;
-    std::string m_filename;
     
     const int HEADER_SIZE = sizeof(Header);
     const int BUCKET_SIZE = sizeof(Bucket);
+    
+    BinaryFile m_file;
+    std::string m_filename;
     
     struct Header {
         int totalBuckets;
@@ -50,8 +51,6 @@ private:
         BinaryFile::Offset next;
         bool used;
     };
-    
-    
 };
 
 #endif // DISKMULTIMAP_H_
