@@ -19,7 +19,6 @@ public:
         MultiMapTuple operator*();
         
     private:
-        // Your private member declarations will go here
         bool m_valid;
     };
     
@@ -35,6 +34,22 @@ public:
 private:
     BinaryFile m_file;
     std::string m_filename;
+    
+    const int HEADER_SIZE = sizeof(Header);
+    const int BUCKET_SIZE = sizeof(Bucket);
+    
+    struct Header {
+        int totalBuckets;
+        int bucketsUsed;
+        // member variable to keep track of
+        // empty spots available for reuse
+    };
+    
+    struct Bucket {
+        MultiMapTuple data;
+        BinaryFile::Offset next;
+        bool used;
+    };
     
     
 };

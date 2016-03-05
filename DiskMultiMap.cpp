@@ -35,6 +35,25 @@ DiskMultiMap::~DiskMultiMap() {
 }
 
 bool DiskMultiMap::createNew(const std::string& filename, unsigned int numBuckets) {
+    m_file.close();
+    if(!m_file.createNew(filename))
+        return false;   // return false if failed
+    
+    // Create hash table header
+    DiskMultiMap::Header h;
+    h.totalBuckets = numBuckets;
+    h.bucketsUsed = 0;
+    m_file.write(h, 0);
+    
+    // Create B buckets
+    for (int i = 0; i < numBuckets; i++) {
+        Bucket b;
+        b.used = false;
+        
+        // Write bucket at the end of the file
+        m_file.write(b, m_file.fileLength());
+    }
+    
     return true;
 }
 
