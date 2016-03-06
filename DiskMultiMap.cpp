@@ -10,8 +10,11 @@ DiskMultiMap::Iterator::Iterator() {
     m_valid = false;
 }
 
-DiskMultiMap::Iterator::Iterator(DiskMultiMap* d) {
-
+DiskMultiMap::Iterator::Iterator(std::string& filename, BinaryFile::Offset offset, std::string key) {
+    m_curr = offset;
+    m_filename = filename;
+    m_key = key;
+    m_valid = true;
 }
 
 bool DiskMultiMap::Iterator::isValid() const {
@@ -20,10 +23,45 @@ bool DiskMultiMap::Iterator::isValid() const {
 
 DiskMultiMap::Iterator& DiskMultiMap::Iterator::operator++() {
     
+    // Open binary file
+    BinaryFile m_file;
+    m_file.openExisting(m_filename);
+    
+    // Set m_curr to be the next value from current association
+    m_file.read(m_curr, m_curr + (2 * (MAX_WORD_LENGTH + 1) ) );
+    
+    if (m_curr == NULL_BUCKET)
+        m_valid = false;
+    
+    // Close file
+    m_file.close();
+    
+    return *this;
 }
 
 MultiMapTuple DiskMultiMap::Iterator::operator*() {
-    return MultiMapTuple();
+    
+    // Open binary file
+    BinaryFile m_file;
+    m_file.openExisting(m_filename);
+    
+    char value[MAX_WORD_LENGTH + 1];
+    char context[MAX_WORD_LENGTH + 1];
+    
+    // Read the value and context from the current association
+    m_file.read(value, MAX_WORD_LENGTH + 1, m_curr);
+    m_file.read(context, MAX_WORD_LENGTH + 1, m_curr + (MAX_WORD_LENGTH + 1));
+    
+    // Fill up the MultiMapTuple to be returned
+    MultiMapTuple m;
+    m.key = m_key;
+    m.value = value;
+    m.context = context;
+    
+    // Close file
+    m_file.close();
+    
+    return m;
 }
 
 // ---------------------------------- //
@@ -60,7 +98,7 @@ bool DiskMultiMap::createNew(const std::string& filename, unsigned int numBucket
     for (int i = 0; i < numBuckets; i++) {
         Bucket b;
         b.used = false;
-        b.head = -1;
+        b.head = NULL_BUCKET;
         strcpy(b.key, "");
         
         // Write bucket at the end of the file
@@ -117,7 +155,7 @@ bool DiskMultiMap::insert(const std::string& key, const std::string& value, cons
     
     // Bucket is empty so far (adding first bucket)
     if (!b.used) {
-        a.next = -1;                            // no next value
+        a.next = NULL_BUCKET;                   // no next value
         b.used = true;
         
         strcpy(b.key, key.c_str()); // copy key into the bucket

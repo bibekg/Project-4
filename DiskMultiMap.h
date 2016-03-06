@@ -6,6 +6,7 @@
 #include "BinaryFile.h"
 
 const int MAX_WORD_LENGTH = 120;
+const int NULL_BUCKET = -1;
 
 class DiskMultiMap {
 public:
@@ -13,7 +14,7 @@ public:
     class Iterator {
     public:
         Iterator();
-        Iterator(DiskMultiMap* d);
+        Iterator(std::string& filename, BinaryFile::Offset offset, std::string key);
         // You may add additional constructors
         bool isValid() const;
         Iterator& operator++();
@@ -21,6 +22,8 @@ public:
         
     private:
         BinaryFile::Offset m_curr;
+        std::string m_key;
+        std::string m_filename;
         bool m_valid;
     };
     
