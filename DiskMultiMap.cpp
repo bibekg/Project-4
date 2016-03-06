@@ -78,11 +78,16 @@ bool DiskMultiMap::openExisting(const std::string& filename) {
 }
 
 void DiskMultiMap::close() {
-    m_file.close();
-    m_filename.clear();
+    if (m_file.isOpen()) {
+        m_file.close();
+        m_filename.clear();
+    }
 }
 
 bool DiskMultiMap::insert(const std::string& key, const std::string& value, const std::string& context) {
+    
+    
+    
     return true;
 }
 
