@@ -53,10 +53,8 @@ bool DiskMultiMap::createNew(const std::string& filename, unsigned int numBucket
     for (int i = 0; i < numBuckets; i++) {
         Bucket b;
         b.used = false;
-        if (i != numBuckets - 1)
-            b.next = m_file.fileLength() + BUCKET_SIZE;
-        else
-            b.next = -1;        // last bucket, no next bucket
+        b.first = -1;
+        strcpy(b.key, "");
         
         // Write bucket at the end of the file
         m_file.write(b, m_file.fileLength());
@@ -85,6 +83,12 @@ void DiskMultiMap::close() {
 }
 
 bool DiskMultiMap::insert(const std::string& key, const std::string& value, const std::string& context) {
+    
+    // Input is too long, return false immediately
+    if (key.length() > 120 || value.length() > 120 || context.length() > 120)
+        return false;
+    
+    
     
     
     

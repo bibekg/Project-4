@@ -45,12 +45,20 @@ private:
         // member variable to keep track of
         // empty spots available for reuse
     };
+
+    struct Association {
+        char value[120 + 1];
+        char context[120 + 1];
+        
+        BinaryFile::Offset next;
+    };
     
     struct Bucket {
-        MultiMapTuple data;
-        BinaryFile::Offset next;
+        char key[120+1];
+        BinaryFile::Offset first;
         bool used;
     };
+
 };
 
 #endif // DISKMULTIMAP_H_
