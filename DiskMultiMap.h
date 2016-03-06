@@ -5,20 +5,22 @@
 #include "MultiMapTuple.h"
 #include "BinaryFile.h"
 
-class DiskMultiMap
-{
+const int MAX_WORD_LENGTH = 120;
+
+class DiskMultiMap {
 public:
     
-    class Iterator
-    {
+    class Iterator {
     public:
         Iterator();
+        Iterator(DiskMultiMap* d);
         // You may add additional constructors
         bool isValid() const;
         Iterator& operator++();
         MultiMapTuple operator*();
         
     private:
+        BinaryFile::Offset m_curr;
         bool m_valid;
     };
     
@@ -32,12 +34,15 @@ public:
     int erase(const std::string& key, const std::string& value, const std::string& context);
     
 private:
-    
     const int HEADER_SIZE = sizeof(Header);
     const int BUCKET_SIZE = sizeof(Bucket);
+    const int ASSOCIATION_SIZE = sizeof(Association);
+    
+    BinaryFile::Offset keyHasher(const std::string& key) const;
     
     BinaryFile m_file;
     std::string m_filename;
+    int m_totalBuckets;
     
     struct Header {
         int totalBuckets;
@@ -45,18 +50,18 @@ private:
         // member variable to keep track of
         // empty spots available for reuse
     };
-
-    struct Association {
-        char value[120 + 1];
-        char context[120 + 1];
-        
-        BinaryFile::Offset next;
-    };
     
     struct Bucket {
         char key[120+1];
-        BinaryFile::Offset first;
+        BinaryFile::Offset head;
         bool used;
+    };
+    
+    struct Association {
+        char value[MAX_WORD_LENGTH + 1];
+        char context[MAX_WORD_LENGTH + 1];
+        
+        BinaryFile::Offset next;
     };
 
 };

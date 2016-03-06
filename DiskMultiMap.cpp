@@ -1,5 +1,6 @@
 #include "DiskMultiMap.h"
 #include "BinaryFile.h"
+#include <functional>
 
 // ------------------------------ //
 // ----- ITERATOR FUNCTIONS ----- //
@@ -9,13 +10,16 @@ DiskMultiMap::Iterator::Iterator() {
     m_valid = false;
 }
 
+DiskMultiMap::Iterator::Iterator(DiskMultiMap* d) {
+
+}
+
 bool DiskMultiMap::Iterator::isValid() const {
     return m_valid;
 }
 
 DiskMultiMap::Iterator& DiskMultiMap::Iterator::operator++() {
-    DiskMultiMap::Iterator it;
-    return it;
+    
 }
 
 MultiMapTuple DiskMultiMap::Iterator::operator*() {
@@ -42,6 +46,9 @@ bool DiskMultiMap::createNew(const std::string& filename, unsigned int numBucket
     if(!m_file.createNew(filename))
         return false;   // return false if failed
     
+    m_filename = filename;
+    m_totalBuckets = numBuckets;
+    
     // Create hash table header
     DiskMultiMap::Header h;
     h.totalBuckets = numBuckets;
@@ -53,7 +60,7 @@ bool DiskMultiMap::createNew(const std::string& filename, unsigned int numBucket
     for (int i = 0; i < numBuckets; i++) {
         Bucket b;
         b.used = false;
-        b.first = -1;
+        b.head = -1;
         strcpy(b.key, "");
         
         // Write bucket at the end of the file
@@ -65,16 +72,22 @@ bool DiskMultiMap::createNew(const std::string& filename, unsigned int numBucket
 
 // BOR: O(1), Actual: O(1)
 bool DiskMultiMap::openExisting(const std::string& filename) {
-    if (m_file.isOpen())
+    if (m_file.isOpen())    // close previously open file
         m_file.close();
     
     if (!m_file.openExisting(filename)) // failed to find file
         return false;
 
     m_filename = filename;
+    
+    // Get total buckets count
+    Header h;
+    m_file.read(h, 0);
+    m_totalBuckets = h.totalBuckets;
     return true;
 }
 
+// BOR: O(1), Actual: O(1)
 void DiskMultiMap::close() {
     if (m_file.isOpen()) {
         m_file.close();
@@ -82,30 +95,68 @@ void DiskMultiMap::close() {
     }
 }
 
+// BOR: O(N/B), Actual: O(1)
+// TODO: MODIFY TO ALLOW INSERTING INTO GAPS
 bool DiskMultiMap::insert(const std::string& key, const std::string& value, const std::string& context) {
     
     // Input is too long, return false immediately
-    if (key.length() > 120 || value.length() > 120 || context.length() > 120)
+    if (key.length() > MAX_WORD_LENGTH || value.length() > MAX_WORD_LENGTH || context.length() > MAX_WORD_LENGTH)
         return false;
     
+    // Hash the key to find which bucket to insert into
+    BinaryFile::Offset bucketOffset = keyHasher(key);
     
+    // Read the bucket
+    Bucket b;
+    m_file.read(b, bucketOffset);
     
+    // Create first association to insert
+    Association a;
+    strcpy(a.value, value.c_str());         // copy value into association
+    strcpy(a.context, context.c_str());     // copy context into association
     
+    // Bucket is empty so far (adding first bucket)
+    if (!b.used) {
+        a.next = -1;                            // no next value
+        b.used = true;
+        
+        strcpy(b.key, key.c_str()); // copy key into the bucket
+    
+        m_file.write(a, m_file.fileLength());   // write to end of file (for now)
+        
+        // ------------------------------------- //
+        // TODO: Modify this when reusing spaces //
+        // ------------------------------------- //
+    }
+    
+    // Bucket already has an association
+    else {
+        a.next = b.head;  // set new association's next to bucket's current head
+        m_file.write(a, m_file.fileLength());
+    }
+    
+    // Set the bucket's head to be newly inserted association
+    b.head = m_file.fileLength() - ASSOCIATION_SIZE;
     
     return true;
 }
 
+// BOR: O(N/B) or O(K), Actual:
 DiskMultiMap::Iterator DiskMultiMap::search(const std::string& key) {
     return DiskMultiMap::Iterator();
 }
 
+// BOR: O(N/B) or O(K), Actual:
 int DiskMultiMap::erase(const std::string& key, const std::string& value, const std::string& context) {
     return 0;
 }
 
+// ----------------------------- //
+// ----- PRIVATE FUNCTIONS ----- //
+// ----------------------------- //
 
-
-
-
-
-
+BinaryFile::Offset DiskMultiMap::keyHasher(const std::string& key) const {
+    std::hash<string> hasher;
+    size_t hashValue = hasher(key);
+    return HEADER_SIZE + (hashValue % m_totalBuckets) * BUCKET_SIZE;
+}
