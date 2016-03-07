@@ -6,7 +6,8 @@
 #include "BinaryFile.h"
 
 const int MAX_WORD_LENGTH = 120;
-const int NULL_BUCKET = -1;
+const int NULL_BUCKET     = -1;
+const int NULL_ASSOC      = -1;
 
 class DiskMultiMap {
 public:
@@ -42,6 +43,9 @@ private:
     const int ASSOCIATION_SIZE = sizeof(Association);
     
     BinaryFile::Offset keyHasher(const std::string& key) const;
+    void addToFreeSlotList(BinaryFile::Offset slot);
+    BinaryFile::Offset slotToInsert();
+    void oneSlotReused();
     
     BinaryFile m_file;
     std::string m_filename;
@@ -50,6 +54,7 @@ private:
     struct Header {
         int totalBuckets;
         int bucketsUsed;
+        BinaryFile::Offset freeSlotsHead;
         // member variable to keep track of
         // empty spots available for reuse
     };

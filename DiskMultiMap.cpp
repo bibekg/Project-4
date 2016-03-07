@@ -94,6 +94,7 @@ bool DiskMultiMap::createNew(const std::string& filename, unsigned int numBucket
     DiskMultiMap::Header h;
     h.totalBuckets = numBuckets;
     h.bucketsUsed = 0;
+    h.freeSlotsHead = NULL_ASSOC;
     m_file.write(h, 0);
     
     // Create #numBuckets buckets
@@ -158,14 +159,22 @@ bool DiskMultiMap::insert(const std::string& key, const std::string& value, cons
     strcpy(a.value, value.c_str());         // copy value into association
     strcpy(a.context, context.c_str());     // copy context into association
     
-    // Bucket is empty so far (adding first bucket)
+    BinaryFile::Offset insertHere = slotToInsert();
+    // Bucket is empty so far (adding first association)
     if (!b.used) {
+        
+        // Let header know a new bucket has been added
+        Header h;
+        m_file.read(h, 0);
+        h.bucketsUsed++;
+        m_file.write(h, 0);
+        
         a.next = NULL_BUCKET;                   // no next value
         b.used = true;
         
         strcpy(b.key, key.c_str()); // copy key into the bucket
     
-        m_file.write(a, m_file.fileLength());   // write to end of file (for now)
+        m_file.write(a, insertHere);   // write to end of file (for now)
         
         // ------------------------------------- //
         // TODO: Modify this when reusing spaces //
@@ -175,11 +184,13 @@ bool DiskMultiMap::insert(const std::string& key, const std::string& value, cons
     // Bucket already has an association
     else {
         a.next = b.head;  // set new association's next to bucket's current head
-        m_file.write(a, m_file.fileLength());
+        
+        m_file.write(a, insertHere);
     }
     
     // Set the bucket's head to be newly inserted association
-    b.head = m_file.fileLength() - ASSOCIATION_SIZE;
+    b.head = insertHere;
+    oneSlotReused();
     m_file.write(b, bucketOffset);
     
     m_file.close();
@@ -191,11 +202,9 @@ DiskMultiMap::Iterator DiskMultiMap::search(const std::string& key) {
 
     m_file.openExisting(m_filename);
     
-    BinaryFile::Offset curr = keyHasher(key);
-    
     // Read the appropriate bucket from the hashing function
     Bucket b;
-    m_file.read(b, curr);
+    m_file.read(b, keyHasher(key)); // ERROR: Not finding the correct bucket
     
     // Create an iterator pointing to first association of that bucket
     if (b.used) {
@@ -211,16 +220,14 @@ DiskMultiMap::Iterator DiskMultiMap::search(const std::string& key) {
     }
 }
 
-// BOR: O(N/B) or O(K), Actual:
+// BOR: O(N/B) or O(K), Actual: O(K)
 int DiskMultiMap::erase(const std::string& key, const std::string& value, const std::string& context) {
     
     m_file.openExisting(m_filename);
     
-    BinaryFile::Offset bucketOffset = keyHasher(key);
-    
     // Read the appropriate bucket from the hashing function
     Bucket b;
-    m_file.read(b, bucketOffset);
+    m_file.read(b, keyHasher(key));
     
     // Key has no associations
     if (!b.used) {
@@ -232,31 +239,28 @@ int DiskMultiMap::erase(const std::string& key, const std::string& value, const 
     BinaryFile::Offset currAssociation = b.head;
     
     int deletedCount = 0;
-    
-    // Check if first node needs to be deleted
     Association firstA;
     m_file.read(firstA, currAssociation);
     string firstValue = firstA.value;
     string firstContext = firstA.context;
     
+    // Check if first node needs to be deleted
     if (firstValue == value && firstContext == context) {
         // Save node's location in a temp (to be reused)
         // Set bucket's head to this node's next
         
-//        BinaryFile::Offset temp = b.head;
+        BinaryFile::Offset toDel = b.head;
         b.head = firstA.next;
         
-        m_file.write(b, bucketOffset);
+        m_file.write(b, keyHasher(key));
         currAssociation = b.head;
         
-        // TODO: MARK DELETED NODES AS USABLE TO ADD NEW NODES
-        // • "temp" variable above contains freed slot
-        
         deletedCount++;
+        addToFreeSlotList(toDel);
     }
     
     // Look through all the associations for that key
-    while (currAssociation != -1) {
+    while (currAssociation != NULL_ASSOC) {
         
         // For a given association, check the next association
         // If it is the association to be deleted,
@@ -273,7 +277,7 @@ int DiskMultiMap::erase(const std::string& key, const std::string& value, const 
         string nextContext = nextA.context;
         if (nextValue == value && nextContext == context) {
             // Found a node to be deleted
-//            BinaryFile::Offset temp = currA.next;
+            BinaryFile::Offset toDel = currA.next;
             currA.next = nextA.next;
             
             m_file.write(currA, currAssociation);
@@ -281,18 +285,23 @@ int DiskMultiMap::erase(const std::string& key, const std::string& value, const 
             // • "temp" variable above contains freed slot
             
             deletedCount++;
+            addToFreeSlotList(toDel);
             
-            if (currA.next == NULL_BUCKET)
-                currAssociation = NULL_BUCKET;
+            if (currA.next == NULL_ASSOC)
+                currAssociation = NULL_ASSOC;
         } else
             currAssociation = currA.next;
     }
     
-    // Bucket has emptied from deletion,
-    // set it to not used
+    // Bucket has emptied from deletion, set it to not used
     if (b.head == NULL_BUCKET) {
         b.used = false;
-        m_file.write(b, bucketOffset);
+        m_file.write(b, keyHasher(key));
+        
+        Header h;
+        m_file.read(h, 0);
+        h.bucketsUsed++;
+        m_file.write(h, 0);
     }
 
     m_file.close();
@@ -308,3 +317,69 @@ BinaryFile::Offset DiskMultiMap::keyHasher(const std::string& key) const {
     size_t hashValue = hasher(key);
     return HEADER_SIZE + (hashValue % m_totalBuckets) * BUCKET_SIZE;
 }
+
+void DiskMultiMap::addToFreeSlotList(BinaryFile::Offset slot) {
+    m_file.openExisting(m_filename);
+    Header h;
+    m_file.read(h, 0);
+    
+    // No free slots currently
+    if (h.freeSlotsHead == NULL_ASSOC)
+        h.freeSlotsHead = slot;
+    else {
+        // Push new empty slot to top of freeSlots list
+        
+        // Set new slot's next to be current top empty slot
+        Association a;
+        m_file.read(a, slot);
+        a.next = h.freeSlotsHead;
+        m_file.write(a, slot);
+        
+        // Set head slot to be new slot
+        h.freeSlotsHead = slot;
+    }
+    
+    m_file.write(h, 0);
+    m_file.close();
+}
+
+BinaryFile::Offset DiskMultiMap::slotToInsert() {
+    
+    m_file.openExisting(m_filename);
+    
+    Header h;
+    m_file.read(h, 0);
+    BinaryFile::Offset freeSlot = h.freeSlotsHead;
+    
+    if (freeSlot == NULL_ASSOC)
+        freeSlot = m_file.fileLength();
+    else
+        freeSlot = h.freeSlotsHead;
+    
+    m_file.close();
+    return freeSlot;
+}
+
+void DiskMultiMap::oneSlotReused() {
+    
+    m_file.openExisting(m_filename);
+    
+    // Set freeSlotsHead to point to the head after the current first free slot
+    // Because that slot (presumably) just got filled up
+    
+    Header h;
+    m_file.read(h, 0);
+    
+    Association a;
+    m_file.read(a, h.freeSlotsHead);
+    
+    h.freeSlotsHead = a.next;
+    m_file.write(h, 0);
+}
+
+
+
+
+
+
+
