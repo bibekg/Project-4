@@ -10,11 +10,12 @@ DiskMultiMap::Iterator::Iterator() {
     m_valid = false;
 }
 
-DiskMultiMap::Iterator::Iterator(std::string& filename, BinaryFile::Offset offset, std::string key) {
+DiskMultiMap::Iterator::Iterator(std::string& filename, BinaryFile::Offset offset, std::string key, int gapSize) {
+    m_valid = true;
     m_curr = offset;
     m_filename = filename;
     m_key = key;
-    m_valid = true;
+    m_gapSize = gapSize;
 }
 
 bool DiskMultiMap::Iterator::isValid() const {
@@ -28,7 +29,9 @@ DiskMultiMap::Iterator& DiskMultiMap::Iterator::operator++() {
     m_file.openExisting(m_filename);
     
     // Set m_curr to be the next value from current association
-    m_file.read(m_curr, m_curr + (2 * (MAX_WORD_LENGTH + 1) ) );
+//    BinaryFile::Offset nextOffset = m_curr + 2 * sizeof(char[MAX_WORD_LENGTH + 1]);
+    BinaryFile::Offset nextOffset = m_curr + m_gapSize;
+    m_file.read(m_curr, nextOffset);
     
     if (m_curr == NULL_BUCKET)
         m_valid = false;
@@ -175,13 +178,30 @@ bool DiskMultiMap::insert(const std::string& key, const std::string& value, cons
     
     // Set the bucket's head to be newly inserted association
     b.head = m_file.fileLength() - ASSOCIATION_SIZE;
+    m_file.write(b, bucketOffset);
     
     return true;
 }
 
 // BOR: O(N/B) or O(K), Actual:
 DiskMultiMap::Iterator DiskMultiMap::search(const std::string& key) {
-    return DiskMultiMap::Iterator();
+
+    BinaryFile::Offset curr = keyHasher(key);
+    
+    // Read the appropriate bucket from the hashing function
+    Bucket b;
+    m_file.read(b, curr);
+    
+    // Create an iterator pointing to first association of that bucket
+    if (b.used) {
+        DiskMultiMap::Iterator it(m_filename, b.head, key, ASSOCIATION_SIZE - sizeof(BinaryFile::Offset));
+        return it;
+    }
+    // If no association, return an invalid iterator
+    else {
+        DiskMultiMap::Iterator it;
+        return it;
+    }
 }
 
 // BOR: O(N/B) or O(K), Actual:

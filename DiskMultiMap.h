@@ -14,13 +14,13 @@ public:
     class Iterator {
     public:
         Iterator();
-        Iterator(std::string& filename, BinaryFile::Offset offset, std::string key);
-        // You may add additional constructors
+        Iterator(std::string& filename, BinaryFile::Offset offset, std::string key, int gapSize);
         bool isValid() const;
         Iterator& operator++();
         MultiMapTuple operator*();
         
     private:
+        int m_gapSize;
         BinaryFile::Offset m_curr;
         std::string m_key;
         std::string m_filename;
@@ -63,7 +63,6 @@ private:
     struct Association {
         char value[MAX_WORD_LENGTH + 1];
         char context[MAX_WORD_LENGTH + 1];
-        
         BinaryFile::Offset next;
     };
 
