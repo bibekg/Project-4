@@ -183,7 +183,7 @@ bool DiskMultiMap::insert(const std::string& key, const std::string& value, cons
     return true;
 }
 
-// BOR: O(N/B) or O(K), Actual:
+// BOR: O(N/B) or O(K), Actual: O(1)
 DiskMultiMap::Iterator DiskMultiMap::search(const std::string& key) {
 
     BinaryFile::Offset curr = keyHasher(key);
@@ -206,7 +206,75 @@ DiskMultiMap::Iterator DiskMultiMap::search(const std::string& key) {
 
 // BOR: O(N/B) or O(K), Actual:
 int DiskMultiMap::erase(const std::string& key, const std::string& value, const std::string& context) {
-    return 0;
+    
+    BinaryFile::Offset bucketOffset = keyHasher(key);
+    
+    // Read the appropriate bucket from the hashing function
+    Bucket b;
+    m_file.read(b, bucketOffset);
+    
+    // Key has no associations
+    if (!b.used)
+        return 0;
+    
+    // Start at first item with that key
+    BinaryFile::Offset currAssociation = b.head;
+    
+    int deletedCount = 0;
+    
+    // Check if first node needs to be deleted
+    Association firstA;
+    m_file.read(firstA, currAssociation);
+    string firstValue = firstA.value;
+    string firstContext = firstA.context;
+    
+    if (firstValue == value && firstContext == context) {
+        // Save node's location in a temp (to be reused)
+        // Set bucket's head to this node's next
+        
+//        BinaryFile::Offset temp = b.head;
+        b.head = firstA.next;
+        
+        // TODO: MARK DELETED NODES AS USABLE TO ADD NEW NODES
+        // • "temp" variable above contains freed slot
+        
+        deletedCount++;
+    }
+    
+    // Look through all the associations for that key
+    while (currAssociation != -1) {
+        
+        // For a given association, check the next association
+        // If it is the association to be deleted,
+        // set the current association's "next" to next's next
+        // Increment deletedCount;
+        
+        Association currA;
+        m_file.read(currA, currAssociation);
+
+        Association nextA;
+        m_file.read(nextA, currA.next);
+        
+        string nextValue = nextA.value;
+        string nextContext = nextA.context;
+        if (nextValue == value && nextContext == context) {
+            // Found a node to be deleted
+//            BinaryFile::Offset temp = currA.next;
+            currA.next = nextA.next;
+            
+            m_file.write(currA, currAssociation);
+            // TODO: MARK DELETED NODES AS USABLE TO ADD NEW NODES
+            // • "temp" variable above contains freed slot
+            
+            deletedCount++;
+            
+            if (currA.next == -1)
+                currAssociation = -1;
+        } else
+            currAssociation = currA.next;
+    }
+
+    return deletedCount;
 }
 
 // ----------------------------- //
