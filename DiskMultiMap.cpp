@@ -144,6 +144,8 @@ bool DiskMultiMap::insert(const std::string& key, const std::string& value, cons
     if (key.length() > MAX_WORD_LENGTH || value.length() > MAX_WORD_LENGTH || context.length() > MAX_WORD_LENGTH)
         return false;
     
+    m_file.openExisting(m_filename);
+    
     // Hash the key to find which bucket to insert into
     BinaryFile::Offset bucketOffset = keyHasher(key);
     
@@ -180,12 +182,15 @@ bool DiskMultiMap::insert(const std::string& key, const std::string& value, cons
     b.head = m_file.fileLength() - ASSOCIATION_SIZE;
     m_file.write(b, bucketOffset);
     
+    m_file.close();
     return true;
 }
 
 // BOR: O(N/B) or O(K), Actual: O(1)
 DiskMultiMap::Iterator DiskMultiMap::search(const std::string& key) {
 
+    m_file.openExisting(m_filename);
+    
     BinaryFile::Offset curr = keyHasher(key);
     
     // Read the appropriate bucket from the hashing function
@@ -195,17 +200,21 @@ DiskMultiMap::Iterator DiskMultiMap::search(const std::string& key) {
     // Create an iterator pointing to first association of that bucket
     if (b.used) {
         DiskMultiMap::Iterator it(m_filename, b.head, key, ASSOCIATION_SIZE - sizeof(BinaryFile::Offset));
+        m_file.close();
         return it;
     }
     // If no association, return an invalid iterator
     else {
         DiskMultiMap::Iterator it;
+        m_file.close();
         return it;
     }
 }
 
 // BOR: O(N/B) or O(K), Actual:
 int DiskMultiMap::erase(const std::string& key, const std::string& value, const std::string& context) {
+    
+    m_file.openExisting(m_filename);
     
     BinaryFile::Offset bucketOffset = keyHasher(key);
     
@@ -214,8 +223,10 @@ int DiskMultiMap::erase(const std::string& key, const std::string& value, const 
     m_file.read(b, bucketOffset);
     
     // Key has no associations
-    if (!b.used)
+    if (!b.used) {
+        m_file.close();
         return 0;
+    }
     
     // Start at first item with that key
     BinaryFile::Offset currAssociation = b.head;
@@ -234,6 +245,9 @@ int DiskMultiMap::erase(const std::string& key, const std::string& value, const 
         
 //        BinaryFile::Offset temp = b.head;
         b.head = firstA.next;
+        
+        m_file.write(b, bucketOffset);
+        currAssociation = b.head;
         
         // TODO: MARK DELETED NODES AS USABLE TO ADD NEW NODES
         // • "temp" variable above contains freed slot
@@ -268,12 +282,20 @@ int DiskMultiMap::erase(const std::string& key, const std::string& value, const 
             
             deletedCount++;
             
-            if (currA.next == -1)
-                currAssociation = -1;
+            if (currA.next == NULL_BUCKET)
+                currAssociation = NULL_BUCKET;
         } else
             currAssociation = currA.next;
     }
+    
+    // Bucket has emptied from deletion,
+    // set it to not used
+    if (b.head == NULL_BUCKET) {
+        b.used = false;
+        m_file.write(b, bucketOffset);
+    }
 
+    m_file.close();
     return deletedCount;
 }
 
