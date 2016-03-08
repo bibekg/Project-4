@@ -301,6 +301,10 @@ int DiskMultiMap::erase(const std::string& key, const std::string& value, const 
     return deletedCount;
 }
 
+// FOR TESTING ONLY: DELETE AFTER TESTING!!!!!!! //
+
+int DiskMultiMap::fileLength() { return m_file.fileLength(); }
+
 // ----------------------------- //
 // ----- PRIVATE FUNCTIONS ----- //
 // ----------------------------- //
