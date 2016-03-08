@@ -29,9 +29,8 @@ DiskMultiMap::Iterator& DiskMultiMap::Iterator::operator++() {
     m_file.openExisting(m_filename);
     
     // Set m_curr to be the next value from current association
-//    BinaryFile::Offset nextOffset = m_curr + 2 * sizeof(char[MAX_WORD_LENGTH + 1]);
     BinaryFile::Offset nextOffset = m_curr + m_gapSize;
-    m_file.read(m_curr, nextOffset);
+    if (!m_file.read(m_curr, nextOffset)) cerr << "Failed to read from disk!" << endl;;
     
     if (m_curr == NULL_BUCKET)
         m_valid = false;
@@ -52,8 +51,8 @@ MultiMapTuple DiskMultiMap::Iterator::operator*() {
     char context[MAX_WORD_LENGTH + 1];
     
     // Read the value and context from the current association
-    m_file.read(value, MAX_WORD_LENGTH + 1, m_curr);
-    m_file.read(context, MAX_WORD_LENGTH + 1, m_curr + (MAX_WORD_LENGTH + 1));
+    if (!m_file.read(value, MAX_WORD_LENGTH + 1, m_curr)) cerr << "Failed to read from disk!" << endl;
+    if (!m_file.read(context, MAX_WORD_LENGTH + 1, m_curr + (MAX_WORD_LENGTH + 1))) cerr << "Failed to read from disk!" << endl;
     
     // Fill up the MultiMapTuple to be returned
     MultiMapTuple m;
@@ -109,8 +108,6 @@ bool DiskMultiMap::createNew(const std::string& filename, unsigned int numBucket
         if (!m_file.write(b, m_file.fileLength())) cerr << "Failed to write to disk!" << endl;
     }
     
-    close();
-    
     return true;
 }
 
@@ -148,8 +145,6 @@ bool DiskMultiMap::insert(const std::string& key, const std::string& value, cons
     if (key.length() > MAX_WORD_LENGTH || value.length() > MAX_WORD_LENGTH || context.length() > MAX_WORD_LENGTH)
         return false;
     
-    openExisting(m_filename);
-    
     // Hash the key to find which bucket to insert into
     BinaryFile::Offset bucketOffset = keyHasher(key);
     
@@ -182,10 +177,6 @@ bool DiskMultiMap::insert(const std::string& key, const std::string& value, cons
         strcpy(b.key, key.c_str()); // copy key into the bucket
     
         if (!m_file.write(a, insertHere)) cerr << "Failed to write to disk!" << endl;   // write to end of file (for now)
-        
-        // ------------------------------------- //
-        // TODO: Modify this when reusing spaces //
-        // ------------------------------------- //
     }
     
     // Bucket already has an association
@@ -199,7 +190,6 @@ bool DiskMultiMap::insert(const std::string& key, const std::string& value, cons
     b.head = insertHere;
     if (!m_file.write(b, bucketOffset)) cerr << "Failed to write to disk!" << endl;;
     
-    close();
     return true;
 }
 
@@ -215,13 +205,11 @@ DiskMultiMap::Iterator DiskMultiMap::search(const std::string& key) {
     // Create an iterator pointing to first association of that bucket
     if (b.used) {
         DiskMultiMap::Iterator it(m_filename, b.head, key, ASSOCIATION_SIZE - sizeof(BinaryFile::Offset));
-        close();
         return it;
     }
     // If no association, return an invalid iterator
     else {
         DiskMultiMap::Iterator it;
-        close();
         return it;
     }
 }
@@ -229,100 +217,87 @@ DiskMultiMap::Iterator DiskMultiMap::search(const std::string& key) {
 // BOR: O(N/B) or O(K), Actual: O(K)
 int DiskMultiMap::erase(const std::string& key, const std::string& value, const std::string& context) {
     
-    openExisting(m_filename);
-    
     // Read the appropriate bucket from the hashing function
     Bucket b;
-    m_file.read(b, keyHasher(key));
+    if (!m_file.read(b, keyHasher(key))) cerr << "Failed to read from disk!" << endl;
     
     // Key has no associations
-    if (!b.used) {
-        close();
-        return 0;
-    }
+    if (!b.used) return 0;
     
     // Start at first item with that key
-    BinaryFile::Offset currAssociation = b.head;
+    BinaryFile::Offset currOffset = b.head;
     
     int deletedCount = 0;
     bool deletedFirst = false;
     
     // Delete first node if it matches, then check (new) first node again
     do {
-        
-        // Get first node and its value/context
+        // Get first association
         Association firstA;
-        m_file.read(firstA, currAssociation);
-        string firstValue = firstA.value;
-        string firstContext = firstA.context;
+        if (!m_file.read(firstA, currOffset)) cerr << "Failed to read from disk!" << endl;
         
         // Check if first node needs to be deleted
-        if (firstValue == value && firstContext == context) {
-            // Save node's location in a temp (to be reused)
-            // Set bucket's head to this node's next
+        if (firstA.value == value && firstA.context == context) {
+
+            deletedCount++;
             deletedFirst = true;
             
-            BinaryFile::Offset toDel = b.head;
+            // Mark bucket's first association as a freed slot
+            addToFreeSlotList(b.head);
+            
+            // Point bucket to second association (aka delete first node)
             b.head = firstA.next;
+            if (!m_file.write(b, keyHasher(key))) cerr << "Failed to write to disk!" << endl;
             
-            m_file.write(b, keyHasher(key));
-            currAssociation = b.head;
-            
-            deletedCount++;
-            addToFreeSlotList(toDel);
+            // Update current offset to be the new bucket head
+            currOffset = b.head;
         } else {
             deletedFirst = false;
         }
         
-    } while (deletedFirst && currAssociation != NULL_ASSOC);
+    } while (deletedFirst && currOffset != NULL_ASSOC);
     
     // Look through all the associations for that key
-    while (currAssociation != NULL_ASSOC) {
+    while (currOffset != NULL_ASSOC) {
         
-        // For a given association, check the next association
-        // If it is the association to be deleted,
-        // set the current association's "next" to next's next
-        // Increment deletedCount;
+        // Read the current and next association (if there is a next)
+        Association currA, nextA;
+        if (!m_file.read(currA, currOffset)) cerr << "Failed to read from disk!" << endl;
+        if (currA.next != -1) {
+            if (!m_file.read(nextA, currA.next)) cerr << "Failed to read from disk!" << endl;
+        }
+        else    // Nothing left to delete
+            return deletedCount;
         
-        Association currA;
-        m_file.read(currA, currAssociation);
-
-        Association nextA;
-        m_file.read(nextA, currA.next);
-        
-        string nextValue = nextA.value;
-        string nextContext = nextA.context;
-        if (nextValue == value && nextContext == context) {
-            // Found a node to be deleted
+        // If the next association is to be deleted
+        if (nextA.value == value && nextA.context == context) {
             
-            BinaryFile::Offset toDel = currA.next;
-            currA.next = nextA.next;
-            
-            m_file.write(currA, currAssociation);
-            // TODO: MARK DELETED NODES AS USABLE TO ADD NEW NODES
-            // • "temp" variable above contains freed slot
-            
+            // Mark next association as deleted
+            addToFreeSlotList(currA.next);
             deletedCount++;
-            addToFreeSlotList(toDel);
             
+            // Set current association to point to deleted association's next
+            currA.next = nextA.next;
+            if (!m_file.write(currA, currOffset)) cerr << "Failed to read from disk!" << endl;
+            
+            // If the next association is empty (only one left in list)
+            // Done deleting
             if (currA.next == NULL_ASSOC)
-                currAssociation = NULL_ASSOC;
+                currOffset = NULL_ASSOC;
         } else
-            currAssociation = currA.next;
+            currOffset = currA.next;    // Move offset to next offset
     }
     
     // Bucket has emptied from deletion, set it to not used
     if (b.head == NULL_BUCKET) {
         b.used = false;
-        m_file.write(b, keyHasher(key));
+        if (!m_file.write(b, keyHasher(key))) cerr << "Failed to write to disk!" << endl;
         
         Header h;
-        m_file.read(h, 0);
+        if (!m_file.read(h, 0)) cerr << "Failed to read to disk!" << endl;
         h.bucketsUsed++;
-        m_file.write(h, 0);
+        if (!m_file.write(h, 0)) cerr << "Failed to write to disk!" << endl;
     }
-
-    close();
     return deletedCount;
 }
 
@@ -337,9 +312,8 @@ BinaryFile::Offset DiskMultiMap::keyHasher(const std::string& key) const {
 }
 
 void DiskMultiMap::addToFreeSlotList(BinaryFile::Offset slot) {
-    m_file.openExisting(m_filename);
     Header h;
-    m_file.read(h, 0);
+    if (!m_file.read(h, 0)) cerr << "Failed to read from disk!" << endl;
     
     // No free slots currently
     if (h.freeSlotsHead == NULL_ASSOC)
@@ -349,22 +323,21 @@ void DiskMultiMap::addToFreeSlotList(BinaryFile::Offset slot) {
         
         // Set new slot's next to be current top empty slot
         Association a;
-        m_file.read(a, slot);
+        if (!m_file.read(a, slot)) cerr << "Failed to read from disk!" << endl;
         a.next = h.freeSlotsHead;
-        m_file.write(a, slot);
+        if (!m_file.write(a, slot)) cerr << "Failed to read from disk!" << endl;
         
         // Set head slot to be new slot
         h.freeSlotsHead = slot;
     }
     
-    m_file.write(h, 0);
-    m_file.close();
+    if (!m_file.write(h, 0)) cerr << "Failed to write to disk!" << endl;
 }
 
 BinaryFile::Offset DiskMultiMap::slotToInsert() {
     
     Header h;
-    m_file.read(h, 0);
+    if (!m_file.read(h, 0)) cerr << "Failed to read from disk!" << endl;
     BinaryFile::Offset freeSlot = h.freeSlotsHead;
     
     if (freeSlot == NULL_ASSOC)
@@ -377,19 +350,17 @@ BinaryFile::Offset DiskMultiMap::slotToInsert() {
 
 void DiskMultiMap::oneSlotReused() {
     
-    m_file.openExisting(m_filename);
-    
     // Set freeSlotsHead to point to the head after the current first free slot
     // Because that slot (presumably) just got filled up
     
     Header h;
-    m_file.read(h, 0);
+    if (!m_file.read(h, 0)) cerr << "Failed to read from disk!" << endl;
     
     Association a;
-    m_file.read(a, h.freeSlotsHead);
+    if (!m_file.read(a, h.freeSlotsHead)) cerr << "Failed to read from disk!" << endl;
     
     h.freeSlotsHead = a.next;
-    m_file.write(h, 0);
+    if (!m_file.write(h, 0)) cerr << "Failed to write to disk!" << endl;
 }
 
 
