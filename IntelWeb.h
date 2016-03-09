@@ -2,6 +2,7 @@
 #define INTELWEB_H_
 
 #include "InteractionTuple.h"
+#include "DiskMultiMap.h"
 #include <string>
 #include <vector>
 
@@ -22,6 +23,12 @@ public:
         bool purge(const std::string& entity);
 
 private:
+    
+    const double LOAD_FACTOR = 0.75;
+    
+    DiskMultiMap m_toFromMap;
+    DiskMultiMap m_fromToMap;
+    
 	// Your private member declarations will go here
 };
 
