@@ -100,5 +100,7 @@ void iteratorTests2() {
 }
 
 int main() {
-    
+    reuseTests();
+    iteratorTests();
+    iteratorTests2();
 }

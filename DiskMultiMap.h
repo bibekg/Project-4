@@ -15,13 +15,14 @@ public:
     class Iterator {
     public:
         Iterator();
-        Iterator(std::string& filename, BinaryFile::Offset offset, std::string key, int gapSize);
+        Iterator(DiskMultiMap* map, std::string key);
         bool isValid() const;
         Iterator& operator++();
         MultiMapTuple operator*();
         
     private:
         int m_gapSize;
+        DiskMultiMap* m_map;
         BinaryFile::Offset m_curr;
         std::string m_key;
         std::string m_filename;
@@ -65,8 +66,8 @@ private:
     
     struct Bucket {
         char key[MAX_WORD_LENGTH+1];
-        BinaryFile::Offset head;
         bool used;
+        BinaryFile::Offset head;
     };
     
     struct Association {

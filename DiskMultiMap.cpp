@@ -10,12 +10,15 @@ DiskMultiMap::Iterator::Iterator() {
     m_valid = false;
 }
 
-DiskMultiMap::Iterator::Iterator(std::string& filename, BinaryFile::Offset offset, std::string key, int gapSize) {
+DiskMultiMap::Iterator::Iterator(DiskMultiMap* map, std::string key) {
     m_valid = true;
-    m_curr = offset;
-    m_filename = filename;
+    m_map = map;
     m_key = key;
-    m_gapSize = gapSize;
+    m_gapSize = m_map->ASSOCIATION_SIZE - sizeof(BinaryFile::Offset);
+    
+    Bucket b;
+    m_map->m_file.read(b, m_map->keyHasher(key));
+    m_curr = b.head;
 }
 
 bool DiskMultiMap::Iterator::isValid() const {
@@ -24,44 +27,31 @@ bool DiskMultiMap::Iterator::isValid() const {
 
 DiskMultiMap::Iterator& DiskMultiMap::Iterator::operator++() {
     
-    // Open binary file
-    BinaryFile m_file;
-    m_file.openExisting(m_filename);
     
-    // Set m_curr to be the next value from current association
-    BinaryFile::Offset nextOffset = m_curr + m_gapSize;
-    if (!m_file.read(m_curr, nextOffset)) cerr << "Failed to read from disk!" << endl;;
     
+    Association a;
+    if (!m_map->m_file.read(a, m_curr)) cerr << "Failed to read from disk!" << endl;
+    m_curr = a.next;
     if (m_curr == NULL_BUCKET)
         m_valid = false;
-    
-    // Close file
-    m_file.close();
     
     return *this;
 }
 
 MultiMapTuple DiskMultiMap::Iterator::operator*() {
     
-    // Open binary file
-    BinaryFile m_file;
-    m_file.openExisting(m_filename);
-    
     char value[MAX_WORD_LENGTH + 1];
     char context[MAX_WORD_LENGTH + 1];
     
     // Read the value and context from the current association
-    if (!m_file.read(value, MAX_WORD_LENGTH + 1, m_curr)) cerr << "Failed to read from disk!" << endl;
-    if (!m_file.read(context, MAX_WORD_LENGTH + 1, m_curr + (MAX_WORD_LENGTH + 1))) cerr << "Failed to read from disk!" << endl;
+    if (!m_map->m_file.read(value, MAX_WORD_LENGTH + 1, m_curr)) cerr << "Failed to read from disk!" << endl;
+    if (!m_map->m_file.read(context, MAX_WORD_LENGTH + 1, m_curr + (MAX_WORD_LENGTH + 1))) cerr << "Failed to read from disk!" << endl;
     
     // Fill up the MultiMapTuple to be returned
     MultiMapTuple m;
     m.key = m_key;
     m.value = value;
     m.context = context;
-    
-    // Close file
-    m_file.close();
     
     return m;
 }
@@ -204,7 +194,7 @@ DiskMultiMap::Iterator DiskMultiMap::search(const std::string& key) {
     
     // Create an iterator pointing to first association of that bucket
     if (b.used) {
-        DiskMultiMap::Iterator it(m_filename, b.head, key, ASSOCIATION_SIZE - sizeof(BinaryFile::Offset));
+        DiskMultiMap::Iterator it(this, key);
         return it;
     }
     // If no association, return an invalid iterator
