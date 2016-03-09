@@ -370,9 +370,3 @@ void DiskMultiMap::oneSlotReused() {
     h.freeSlotsHead = a.next;
     if (!m_file.write(h, 0)) cerr << "Failed to write to disk!" << endl;
 }
-
-
-
-
-
-
