@@ -21,11 +21,9 @@ public:
         MultiMapTuple operator*();
         
     private:
-        int m_gapSize;
         DiskMultiMap* m_map;
         BinaryFile::Offset m_curr;
         std::string m_key;
-        std::string m_filename;
         bool m_valid;
     };
     
@@ -65,12 +63,12 @@ private:
     };
     
     struct Bucket {
-        char key[MAX_WORD_LENGTH+1];
         bool used;
         BinaryFile::Offset head;
     };
     
     struct Association {
+        char key[MAX_WORD_LENGTH + 1];
         char value[MAX_WORD_LENGTH + 1];
         char context[MAX_WORD_LENGTH + 1];
         BinaryFile::Offset next;
