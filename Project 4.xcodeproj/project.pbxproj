@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		A62DF74F1C8CEF2500B918D8 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A62DF74E1C8CEF2500B918D8 /* main.cpp */; };
+		A69BEFD71C8FB92900111E7E /* IntelWeb.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A69BEFD61C8FB92900111E7E /* IntelWeb.cpp */; };
 		A6DABC8B1C8EC668003D9F1F /* DiskMultiMap.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A6DABC891C8EC668003D9F1F /* DiskMultiMap.cpp */; };
 /* End PBXBuildFile section */
 
@@ -28,6 +29,8 @@
 		A626CE651C8B8CFD006A50DF /* MultiMapTuple.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MultiMapTuple.h; sourceTree = "<group>"; };
 		A626CE691C8B97FC006A50DF /* BinaryFile.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BinaryFile.h; sourceTree = "<group>"; };
 		A62DF74E1C8CEF2500B918D8 /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
+		A69BEFD51C8FB90100111E7E /* IntelWeb.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = IntelWeb.h; sourceTree = "<group>"; };
+		A69BEFD61C8FB92900111E7E /* IntelWeb.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = IntelWeb.cpp; sourceTree = "<group>"; };
 		A6DABC891C8EC668003D9F1F /* DiskMultiMap.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = DiskMultiMap.cpp; sourceTree = "<group>"; };
 		A6DABC8A1C8EC668003D9F1F /* DiskMultiMap.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DiskMultiMap.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -46,8 +49,10 @@
 		A626CE511C8B8CB9006A50DF = {
 			isa = PBXGroup;
 			children = (
+				A62DF74E1C8CEF2500B918D8 /* main.cpp */,
 				A626CE6A1C8B981D006A50DF /* Provided */,
 				A626CE681C8B95BD006A50DF /* DiskMultiMap */,
+				A69BEFD81C8FB92E00111E7E /* IntelWeb */,
 				A626CE5B1C8B8CB9006A50DF /* Products */,
 			);
 			sourceTree = "<group>";
@@ -63,7 +68,6 @@
 		A626CE681C8B95BD006A50DF /* DiskMultiMap */ = {
 			isa = PBXGroup;
 			children = (
-				A62DF74E1C8CEF2500B918D8 /* main.cpp */,
 				A6DABC891C8EC668003D9F1F /* DiskMultiMap.cpp */,
 				A6DABC8A1C8EC668003D9F1F /* DiskMultiMap.h */,
 			);
@@ -77,6 +81,15 @@
 				A626CE691C8B97FC006A50DF /* BinaryFile.h */,
 			);
 			name = Provided;
+			sourceTree = "<group>";
+		};
+		A69BEFD81C8FB92E00111E7E /* IntelWeb */ = {
+			isa = PBXGroup;
+			children = (
+				A69BEFD51C8FB90100111E7E /* IntelWeb.h */,
+				A69BEFD61C8FB92900111E7E /* IntelWeb.cpp */,
+			);
+			name = IntelWeb;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -136,6 +149,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A6DABC8B1C8EC668003D9F1F /* DiskMultiMap.cpp in Sources */,
+				A69BEFD71C8FB92900111E7E /* IntelWeb.cpp in Sources */,
 				A62DF74F1C8CEF2500B918D8 /* main.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
