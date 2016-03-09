@@ -37,9 +37,11 @@ public:
     Iterator search(const std::string& key);
     int erase(const std::string& key, const std::string& value, const std::string& context);
     
-    // DELETE AFTER TESTING
+    // !!!!!!!!!!!!!!!!!!!! //
+    // DELETE AFTER TESTING //
+    // !!!!!!!!!!!!!!!!!!!! //
     
-    int fileLength();
+    BinaryFile::Offset fileLength();
     
 private:
     const int HEADER_SIZE = sizeof(Header);
@@ -48,7 +50,7 @@ private:
     
     BinaryFile::Offset keyHasher(const std::string& key) const;
     void addToFreeSlotList(BinaryFile::Offset slot);
-    BinaryFile::Offset slotToInsert();
+    bool reuseSlot(BinaryFile::Offset& slot);
     void oneSlotReused();
     
     BinaryFile m_file;
@@ -59,8 +61,6 @@ private:
         int totalBuckets;
         int bucketsUsed;
         BinaryFile::Offset freeSlotsHead;
-        // member variable to keep track of
-        // empty spots available for reuse
     };
     
     struct Bucket {

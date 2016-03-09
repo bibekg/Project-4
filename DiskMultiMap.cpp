@@ -157,10 +157,12 @@ bool DiskMultiMap::insert(const std::string& key, const std::string& value, cons
     strcpy(a.value, value.c_str());         // copy value into association
     strcpy(a.context, context.c_str());     // copy context into association
     
-    BinaryFile::Offset insertHere = slotToInsert();
-    bool reusedSlot = false;;
-    if (insertHere != m_file.fileLength()) reusedSlot = true;
-    if (reusedSlot) oneSlotReused();
+    BinaryFile::Offset insertHere;
+    bool reusedSlot = reuseSlot(insertHere);
+    if (reusedSlot) {
+        oneSlotReused();
+        cerr << "Reused a slot" << endl;
+    }
     
     // Bucket is empty so far (adding first association)
     if (!b.used) {
@@ -195,8 +197,6 @@ bool DiskMultiMap::insert(const std::string& key, const std::string& value, cons
 
 // BOR: O(N/B) or O(K), Actual: O(1)
 DiskMultiMap::Iterator DiskMultiMap::search(const std::string& key) {
-
-    openExisting(m_filename);
     
     // Read the appropriate bucket from the hashing function
     Bucket b;
@@ -289,13 +289,13 @@ int DiskMultiMap::erase(const std::string& key, const std::string& value, const 
     }
     
     // Bucket has emptied from deletion, set it to not used
-    if (b.head == NULL_BUCKET) {
+    if (b.head == NULL_ASSOC) {
         b.used = false;
         if (!m_file.write(b, keyHasher(key))) cerr << "Failed to write to disk!" << endl;
         
         Header h;
         if (!m_file.read(h, 0)) cerr << "Failed to read to disk!" << endl;
-        h.bucketsUsed++;
+        h.bucketsUsed--;
         if (!m_file.write(h, 0)) cerr << "Failed to write to disk!" << endl;
     }
     return deletedCount;
@@ -303,7 +303,7 @@ int DiskMultiMap::erase(const std::string& key, const std::string& value, const 
 
 // FOR TESTING ONLY: DELETE AFTER TESTING!!!!!!! //
 
-int DiskMultiMap::fileLength() { return m_file.fileLength(); }
+BinaryFile::Offset DiskMultiMap::fileLength() { return m_file.fileLength(); }
 
 // ----------------------------- //
 // ----- PRIVATE FUNCTIONS ----- //
@@ -320,8 +320,12 @@ void DiskMultiMap::addToFreeSlotList(BinaryFile::Offset slot) {
     if (!m_file.read(h, 0)) cerr << "Failed to read from disk!" << endl;
     
     // No free slots currently
-    if (h.freeSlotsHead == NULL_ASSOC)
-        h.freeSlotsHead = slot;
+    if (h.freeSlotsHead == NULL_ASSOC) {
+        Association a;
+        m_file.read(a, slot);
+        a.next = NULL_ASSOC;
+        m_file.write(a, slot);
+    }
     else {
         // Push new empty slot to top of freeSlots list
         
@@ -330,26 +334,26 @@ void DiskMultiMap::addToFreeSlotList(BinaryFile::Offset slot) {
         if (!m_file.read(a, slot)) cerr << "Failed to read from disk!" << endl;
         a.next = h.freeSlotsHead;
         if (!m_file.write(a, slot)) cerr << "Failed to read from disk!" << endl;
-        
-        // Set head slot to be new slot
-        h.freeSlotsHead = slot;
     }
     
+    h.freeSlotsHead = slot;
     if (!m_file.write(h, 0)) cerr << "Failed to write to disk!" << endl;
 }
 
-BinaryFile::Offset DiskMultiMap::slotToInsert() {
+bool DiskMultiMap::reuseSlot(BinaryFile::Offset& slot) {
     
     Header h;
     if (!m_file.read(h, 0)) cerr << "Failed to read from disk!" << endl;
     BinaryFile::Offset freeSlot = h.freeSlotsHead;
     
-    if (freeSlot == NULL_ASSOC)
-        freeSlot = m_file.fileLength();
-    else
-        freeSlot = h.freeSlotsHead;
-    
-    return freeSlot;
+    if (freeSlot == NULL_ASSOC) {
+        slot = m_file.fileLength();
+        return false;
+    }
+    else {
+        slot = h.freeSlotsHead;
+        return true;
+    }
 }
 
 void DiskMultiMap::oneSlotReused() {

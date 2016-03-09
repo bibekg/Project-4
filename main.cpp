@@ -45,21 +45,34 @@ using namespace std;
 int main() {
     DiskMultiMap x;
     x.createNew("myhashtable.dat",100); // empty, with 100 buckets
+    cerr << "Initial size: " << x.fileLength() << endl;
     
     x.insert("hmm.exe", "pfft.exe", "m52902");
     x.insert("hmm.exe", "pfft.exe", "m52902");
     x.insert("hmm.exe", "pfft.exe", "m52902");
-    x.insert("hmm.exe", "pfft.exe", "m52902");
+    cerr << "After 3 inserts: " << x.fileLength() << endl;
     
-    int initlength = x.fileLength();
+    BinaryFile::Offset initlength = x.fileLength();
     
     x.erase("hmm.exe", "pfft.exe", "m52902");
+    cerr << "After erase: " << x.fileLength() << endl;
     
     x.insert("hmm.exe", "pfft.exe", "m52902");
     x.insert("hmm.exe", "pfft.exe", "m52902");
     x.insert("hmm.exe", "pfft.exe", "m52902");
+    cerr << "After 3 more inserts: " << x.fileLength() << endl;
     
     assert(initlength == x.fileLength());
+    
+    x.insert("hmm.exe", "pfft.exe", "m52902");
+    cerr << "After one extra insert: " << x.fileLength() << endl;
+    x.insert("hmm.exe", "pfft.exe", "m52902");
+    cerr << "After two extra inserts: " << x.fileLength() << endl;
+    x.insert("hmm.exe", "pfft.exe", "m52902");
+    cerr << "After three extra inserts: " << x.fileLength() << endl;
+    
+    BinaryFile::Offset postLength = x.fileLength();
+    assert(initlength != postLength);
     
     cout << "passed" << endl;
     
