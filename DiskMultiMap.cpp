@@ -14,7 +14,6 @@ DiskMultiMap::Iterator::Iterator(DiskMultiMap* map, std::string key) {
     m_valid = true;
     m_map = map;
     m_key = key;
-    m_gapSize = m_map->ASSOCIATION_SIZE - sizeof(BinaryFile::Offset);
     
     Bucket b;
     m_map->m_file.read(b, m_map->keyHasher(key));
@@ -27,10 +26,23 @@ bool DiskMultiMap::Iterator::isValid() const {
 
 DiskMultiMap::Iterator& DiskMultiMap::Iterator::operator++() {
     
-    
-    
     Association a;
-    if (!m_map->m_file.read(a, m_curr)) cerr << "Failed to read from disk!" << endl;
+    
+    // Read next until you find a matching key
+    do {
+        // Read the current association
+        if (!m_map->m_file.read(a, m_curr)) cerr << "Failed to read from disk!" << endl;
+        
+        // Increment current association to next
+        m_curr = a.next;
+        
+        // If the new association is null, stop searching
+        if (m_curr == NULL_ASSOC)
+            break;
+        
+    // Once a matching key is found, break out
+    } while (a.key != m_key);
+    
     m_curr = a.next;
     if (m_curr == NULL_BUCKET)
         m_valid = false;
@@ -40,18 +52,15 @@ DiskMultiMap::Iterator& DiskMultiMap::Iterator::operator++() {
 
 MultiMapTuple DiskMultiMap::Iterator::operator*() {
     
-    char value[MAX_WORD_LENGTH + 1];
-    char context[MAX_WORD_LENGTH + 1];
-    
     // Read the value and context from the current association
-    if (!m_map->m_file.read(value, MAX_WORD_LENGTH + 1, m_curr)) cerr << "Failed to read from disk!" << endl;
-    if (!m_map->m_file.read(context, MAX_WORD_LENGTH + 1, m_curr + (MAX_WORD_LENGTH + 1))) cerr << "Failed to read from disk!" << endl;
+    Association a;
+    m_map->m_file.read(a, m_curr);
     
     // Fill up the MultiMapTuple to be returned
     MultiMapTuple m;
-    m.key = m_key;
-    m.value = value;
-    m.context = context;
+    m.key = a.key;
+    m.value = a.value;
+    m.context = a.context;
     
     return m;
 }
@@ -92,7 +101,6 @@ bool DiskMultiMap::createNew(const std::string& filename, unsigned int numBucket
         Bucket b;
         b.used = false;
         b.head = NULL_BUCKET;
-        strcpy(b.key, "");
         
         // Write bucket at the end of the file
         if (!m_file.write(b, m_file.fileLength())) cerr << "Failed to write to disk!" << endl;
@@ -144,6 +152,7 @@ bool DiskMultiMap::insert(const std::string& key, const std::string& value, cons
     
     // Create first association to insert
     Association a;
+    strcpy(a.key, key.c_str());             // copy key into association
     strcpy(a.value, value.c_str());         // copy value into association
     strcpy(a.context, context.c_str());     // copy context into association
     
@@ -166,7 +175,7 @@ bool DiskMultiMap::insert(const std::string& key, const std::string& value, cons
         a.next = NULL_BUCKET;                   // no next value
         b.used = true;
         
-        strcpy(b.key, key.c_str()); // copy key into the bucket
+//        strcpy(b.key, key.c_str()); // copy key into the bucket
     
         if (!m_file.write(a, insertHere)) cerr << "Failed to write to disk!" << endl;   // write to end of file (for now)
     }
