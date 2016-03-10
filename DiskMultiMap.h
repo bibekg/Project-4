@@ -6,8 +6,7 @@
 #include "BinaryFile.h"
 
 const int MAX_WORD_LENGTH = 120;
-const int NULL_BUCKET     = -1;
-const int NULL_ASSOC      = -1;
+const int NULL_SLOT       = -1;
 
 class DiskMultiMap {
 public:
@@ -58,7 +57,6 @@ private:
     
     struct Header {
         int totalBuckets;
-        int bucketsUsed;
         BinaryFile::Offset freeSlotsHead;
     };
     

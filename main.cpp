@@ -9,10 +9,46 @@
 
 #include <iostream>
 #include <cassert>
+#include <set>
 #include "DiskMultiMap.h"
 #include "MultiMapTuple.h"
 
 using namespace std;
+
+void saiReuseTests() {
+    DiskMultiMap x;
+    x.createNew("myhashtable.dat",100); // empty, with 100 buckets
+    cout << x.fileLength() << endl;
+    x.insert("hmm.exe", "pfft.exe", "m52902");
+    x.insert("hmm.exe", "pfft.exe", "m52902");
+    x.insert("hmm.exe", "pfft.exe", "m10001");
+    x.insert("blah.exe", "bletch.exe", "m0003");
+    cout << x.fileLength() << endl;
+    if (x.erase("hmm.exe", "pfft.exe", "m52902") == 2)
+        cout << "Just erased 2 items from the table!\n";
+    if (x.erase("hmm.exe", "pfft.exe", "m10001") > 0)
+        cout << "Just erased at least 1 item from the table!\n";
+    if (x.erase("blah.exe", "bletch.exe", "m66666") == 0)
+        cout << "I didn't erase this item cause it wasn't there\n";
+    x.insert("hmm.exe", "pfft.exe", "m52902");
+    x.insert("hmm.exe", "pfft.exe", "m52902");
+    x.insert("hmm.exe", "pfft.exe", "m52902");
+    cout << x.fileLength() << endl;
+    x.insert("hmm.exe", "pfft.exe", "m52902");
+    x.insert("hmm.exe", "pfft.exe", "m52902");
+    x.insert("hmm.exe", "pfft.exe", "m52902");
+    cout << x.fileLength() << endl;
+    if (x.erase("hmm.exe", "pfft.exe", "m52902") == 6)
+        cout << "Just erased 6 items from the table!\n" << endl;
+    x.insert("hmm.exe", "pfft.exe", "m10001");
+    x.insert("hmm.exe", "pfft.exe", "m10001");
+    x.insert("hmm.exe", "pfft.exe", "m10001");
+    x.insert("hmm.exe", "pfft.exe", "m10001");
+    x.insert("hmm.exe", "pfft.exe", "m10001");
+    x.insert("hmm.exe", "pfft.exe", "m10001");
+    cout << x.fileLength() << endl;
+    x.insert("hmm.exe", "pfft.exe", "m10001");
+}
 
 void reuseTests() {
     DiskMultiMap x;
@@ -100,7 +136,5 @@ void iteratorTests2() {
 }
 
 int main() {
-    reuseTests();
-    iteratorTests();
-    iteratorTests2();
+    saiReuseTests();
 }
