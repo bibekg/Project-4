@@ -35,12 +35,6 @@ public:
     Iterator search(const std::string& key);
     int erase(const std::string& key, const std::string& value, const std::string& context);
     
-    // !!!!!!!!!!!!!!!!!!!! //
-    // DELETE AFTER TESTING //
-    // !!!!!!!!!!!!!!!!!!!! //
-    
-    BinaryFile::Offset fileLength();
-    
 private:
     const int HEADER_SIZE = sizeof(Header);
     const int BUCKET_SIZE = sizeof(Bucket);

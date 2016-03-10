@@ -9,7 +9,7 @@
 /* Begin PBXBuildFile section */
 		A69BEFDC1C8FCE6600111E7E /* IntelWeb.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A69BEFD61C8FB92900111E7E /* IntelWeb.cpp */; };
 		A69BEFE81C9107C800111E7E /* p4tester.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A69BEFDF1C8FECBE00111E7E /* p4tester.cpp */; };
-		A6DABC8B1C8EC668003D9F1F /* DiskMultiMap.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A6DABC891C8EC668003D9F1F /* DiskMultiMap.cpp */; };
+		A69BEFED1C915D6B00111E7E /* DiskMultiMap.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A6DABC891C8EC668003D9F1F /* DiskMultiMap.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -33,6 +33,8 @@
 		A69BEFD61C8FB92900111E7E /* IntelWeb.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = IntelWeb.cpp; sourceTree = "<group>"; };
 		A69BEFD91C8FC86A00111E7E /* InteractionTuple.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = InteractionTuple.h; sourceTree = "<group>"; };
 		A69BEFDF1C8FECBE00111E7E /* p4tester.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = p4tester.cpp; sourceTree = "<group>"; };
+		A69BEFEA1C91543700111E7E /* DiskMultiMapd.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = DiskMultiMapd.cpp; sourceTree = "<group>"; };
+		A69BEFEB1C91543700111E7E /* DiskMultiMapd.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DiskMultiMapd.h; sourceTree = "<group>"; };
 		A6DABC891C8EC668003D9F1F /* DiskMultiMap.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = DiskMultiMap.cpp; sourceTree = "<group>"; };
 		A6DABC8A1C8EC668003D9F1F /* DiskMultiMap.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DiskMultiMap.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -73,6 +75,8 @@
 			children = (
 				A6DABC891C8EC668003D9F1F /* DiskMultiMap.cpp */,
 				A6DABC8A1C8EC668003D9F1F /* DiskMultiMap.h */,
+				A69BEFEA1C91543700111E7E /* DiskMultiMapd.cpp */,
+				A69BEFEB1C91543700111E7E /* DiskMultiMapd.h */,
 			);
 			name = DiskMultiMap;
 			sourceTree = "<group>";
@@ -153,7 +157,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A69BEFE81C9107C800111E7E /* p4tester.cpp in Sources */,
-				A6DABC8B1C8EC668003D9F1F /* DiskMultiMap.cpp in Sources */,
+				A69BEFED1C915D6B00111E7E /* DiskMultiMap.cpp in Sources */,
 				A69BEFDC1C8FCE6600111E7E /* IntelWeb.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

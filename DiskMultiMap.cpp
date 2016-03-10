@@ -1,6 +1,8 @@
+#include <functional>
+#include <string>
+
 #include "DiskMultiMap.h"
 #include "BinaryFile.h"
-#include <functional>
 
 // ------------------------------ //
 // ----- ITERATOR FUNCTIONS ----- //
@@ -145,7 +147,6 @@ void DiskMultiMap::close() {
 }
 
 // BOR: O(N/B), Actual: O(1)
-// TODO: MODIFY TO ALLOW INSERTING INTO GAPS
 bool DiskMultiMap::insert(const std::string& key, const std::string& value, const std::string& context) {
     
     // Input is too long, return false immediately
@@ -189,7 +190,8 @@ bool DiskMultiMap::insert(const std::string& key, const std::string& value, cons
     return true;
 }
 
-// BOR: O(N/B) or O(K), Actual: O(1)
+// Assuming N items and B buckets, keys have K associations
+// BOR: O(N/B) or O(K), Actual: O(K)
 DiskMultiMap::Iterator DiskMultiMap::search(const std::string& key) {
     
     // Read the appropriate bucket from the hashing function
@@ -211,6 +213,7 @@ DiskMultiMap::Iterator DiskMultiMap::search(const std::string& key) {
     }
 }
 
+// Assuming N items and B buckets, keys have K associations
 // BOR: O(N/B) or O(K), Actual: O(K)
 int DiskMultiMap::erase(const std::string& key, const std::string& value, const std::string& context) {
     
@@ -294,10 +297,6 @@ int DiskMultiMap::erase(const std::string& key, const std::string& value, const 
     }
     return deletedCount;
 }
-
-// FOR TESTING ONLY: DELETE AFTER TESTING!!!!!!! //
-
-BinaryFile::Offset DiskMultiMap::fileLength() { return m_file.fileLength(); }
 
 // ----------------------------- //
 // ----- PRIVATE FUNCTIONS ----- //

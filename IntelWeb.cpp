@@ -4,6 +4,7 @@
 #include <vector>
 #include <set>
 #include <queue>
+#include <string>
 
 #include "IntelWeb.h"
 #include "DiskMultiMap.h"
@@ -108,6 +109,9 @@ bool IntelWeb::ingest(const string& telemetryFile) {
     return true;
 }
 
+// Assuming T telemetry lines
+// BOR: O(T) disk accesses & O(TlogT) operations involving in-memory data structures
+// Actual:
 unsigned int IntelWeb::crawl(const vector<string>& indicators, unsigned int minPrevalenceToBeGood, vector<string>& badEntitiesFound, vector<InteractionTuple>& badInteractions) {
     
     set<string> badEntitySet;
@@ -117,61 +121,45 @@ unsigned int IntelWeb::crawl(const vector<string>& indicators, unsigned int minP
     // Load queue with malicious indicators
     for (int i = 0; i < indicators.size(); ++i) {
         maliciousQueue.push(indicators[i]);
-        badEntitySet.insert(indicators[i]);
-    }
+        if (prevalenceOf(indicators[i]) > 0)
+            badEntitySet.insert(indicators[i]);
+    }       // O(1)
     
     // While there are still malicious entities to check
-    while (!maliciousQueue.empty()) {
+    while (!maliciousQueue.empty()) {                                   // Runs T times
         string entity = maliciousQueue.front();
         maliciousQueue.pop();
         
         // Look for the entity in the to-from map
         DiskMultiMap::Iterator it = m_toFromMap.search(entity);
-        while (it.isValid()) {
-            
+        while (it.isValid()) {                                          // Runs T/B times
             MultiMapTuple m = *it;
-            
-            // If the value is malicious, mark it
-            if(prevalenceOf(m.value) < minPrevalenceToBeGood) {
-                
-                if(badEntitySet.insert(m.value).second) {       // returns true if insert was unique
+            if(prevalenceOf(m.value) < minPrevalenceToBeGood)
+                if(badEntitySet.insert(m.value).second)         //
                     maliciousQueue.push(m.value);               // need to check against this entity later
-                    cout << "Bad Entity Set Size: " << badEntitySet.size() << endl;
-                }
-            }
             
             // The interaction is bad, regardless of the value (since key was malicious)
             InteractionTuple t;
             t.to = m.value;
             t.from = m.key;
             t.context = m.context;
-            
             badInteractionSet.insert(t);
-            
             ++it;
         }
         
         // Look for the entity in the from-to map
         it = m_fromToMap.search(entity);
         while (it.isValid()) {
-            
             MultiMapTuple m = *it;
-            
-            // If the value is malicious, mark it
-            if(prevalenceOf(m.value) < minPrevalenceToBeGood) {
-                
-                if(badEntitySet.insert(m.value).second) {       // returns true if insert was unique
+            if(prevalenceOf(m.value) < minPrevalenceToBeGood)
+                if(badEntitySet.insert(m.value).second)         // returns true if insert was unique
                     maliciousQueue.push(m.value);               // need to check against this entity later
-                    cout << "Bad Entity Set Size: " << badEntitySet.size() << endl;
-                }
-            }
             
             // The interaction is bad, regardless of the value (since key was malicious)
             InteractionTuple t;
             t.to = m.key;
             t.from = m.value;
             t.context = m.context;
-            
             badInteractionSet.insert(t);
             
             ++it;
@@ -182,26 +170,46 @@ unsigned int IntelWeb::crawl(const vector<string>& indicators, unsigned int minP
     badEntitiesFound.clear();
     badInteractions.clear();
     
-    cout << "Bad Entity Set Size: " << badEntitySet.size() << endl;
-    cout << "Bad Interactions Set Size: " << badInteractionSet.size() << endl;
-    
-    for (set<string>::iterator itbE = badEntitySet.begin(); itbE != badEntitySet.end();) {
+    for (set<string>::iterator itbE = badEntitySet.begin(); itbE != badEntitySet.end(); itbE++)
         badEntitiesFound.push_back(*itbE);
-        itbE++;
-    }
     
-    for (set<InteractionTuple>::iterator itBIS = badInteractionSet.begin(); itBIS != badInteractionSet.end();) {
+    for (set<InteractionTuple>::iterator itBIS = badInteractionSet.begin(); itBIS != badInteractionSet.end(); itBIS++)
         badInteractions.push_back(*itBIS);
-        itBIS++;
-    }
     
     return int(badEntitySet.size() + indicators.size());
 }
 
+// BOR: O(M), Actual: O(M)
+// M is the number of items matching the string parameter
 bool IntelWeb::purge(const string& entity) {
+
+    DiskMultiMap::Iterator it = m_fromToMap.search(entity);
+    
+    // For every association in from-to with entity as the key
+    while (it.isValid()) {
+        MultiMapTuple m = *it;
+        m_fromToMap.erase(m.key, m.value, m.context);   // erase from map1
+        m_toFromMap.erase(m.value, m.key, m.context);   // erase from map2
+        decrementPrevalence(m.value);
+        
+        it = m_fromToMap.search(entity);
+    }
+    
+    it = m_toFromMap.search(entity);
+    
+    // For every association with entity as the key
+    while (it.isValid()) {
+        MultiMapTuple m = *it;
+        m_toFromMap.erase(m.key, m.value, m.context);   // erase from map2
+        m_fromToMap.erase(m.value, m.key, m.context);   // erase from map1
+        decrementPrevalence(m.value);
+        
+        it = m_toFromMap.search(entity);
+    }
+    
+    setPrevalenceZero(entity);
     return true;
 }
-
 
 // Private Functions
 
@@ -221,7 +229,21 @@ int IntelWeb::prevalenceOf(string entity) {
 
 void IntelWeb::incrementPrevalence(string entity) {
     int count = prevalenceOf(entity);
+    m_prevalenceMap.erase(entity, to_string(count), "");
     m_prevalenceMap.insert(entity, to_string(count + 1), "");
+}
+
+void IntelWeb::decrementPrevalence(string entity) {
+    int count = prevalenceOf(entity);
+    m_prevalenceMap.erase(entity, to_string(count), "");
+    m_prevalenceMap.insert(entity, to_string(count - 1), "");
+}
+
+void IntelWeb::setPrevalenceZero(string entity) {
+    int count = prevalenceOf(entity);
+    m_prevalenceMap.erase(entity, to_string(count), "");
+    m_prevalenceMap.insert(entity, to_string(0), "");
+
 }
 
 bool operator<(const InteractionTuple& t1, const InteractionTuple& t2) {

@@ -32,6 +32,8 @@ private:
     
     int prevalenceOf(std::string entity);
     void incrementPrevalence(std::string entity);
+    void decrementPrevalence(std::string entity);
+    void setPrevalenceZero(std::string entity);
 };
 
 
