@@ -5,6 +5,7 @@
 #include "DiskMultiMap.h"
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 class IntelWeb
 {
@@ -30,6 +31,9 @@ private:
     DiskMultiMap m_fromToMap;
     DiskMultiMap m_prevalenceMap;
     
+    unordered_map<std::string, int> m_prevCache;
+    
+    int getCachedPrevalence(string entity);
     int prevalenceOf(std::string entity);
     void incrementPrevalence(std::string entity);
     void decrementPrevalence(std::string entity);
