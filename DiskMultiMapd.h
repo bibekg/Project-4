@@ -10,6 +10,8 @@
 // since it uses in-memory data structures to hold all the data, the spec
 // forbids you from using this as the DiskMultiMap implementation you turn in.
 
+#define _CRT_SECURE_NO_WARNINGS
+
 #include <iostream>
 #include <fstream>
 #include <string>

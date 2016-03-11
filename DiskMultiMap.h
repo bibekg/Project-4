@@ -40,25 +40,14 @@ private:
     const int BUCKET_SIZE = sizeof(Bucket);
     const int ASSOCIATION_SIZE = sizeof(Association);
     
-    BinaryFile::Offset keyHasher(const std::string& key) const;
-    void addToFreeSlotList(BinaryFile::Offset slot);
-    bool reuseSlot(BinaryFile::Offset& slot);
-    void oneSlotReused();
-    
-    BinaryFile m_file;
-    std::string m_filename;
-    int m_totalBuckets;
-    
     struct Header {
         int totalBuckets;
         BinaryFile::Offset freeSlotsHead;
     };
-    
     struct Bucket {
         bool used;
         BinaryFile::Offset head;
     };
-    
     struct Association {
         char key[MAX_WORD_LENGTH + 1];
         char value[MAX_WORD_LENGTH + 1];
@@ -66,6 +55,13 @@ private:
         BinaryFile::Offset next;
     };
 
+    BinaryFile m_file;
+    int m_totalBuckets;
+    
+    BinaryFile::Offset keyHasher(const std::string& key) const;
+    void addToFreeSlotList(BinaryFile::Offset slot);
+    bool reuseSlot(BinaryFile::Offset& slot);
+    void oneSlotReused();
 };
 
 #endif // DISKMULTIMAP_H_

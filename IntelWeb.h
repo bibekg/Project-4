@@ -25,14 +25,15 @@ public:
     
 private:
     
-    const double LOAD_FACTOR = 0.75;
+    const double LOAD_FACTOR = 0.5;
+    const int MAX_CACHE_SIZE = 10000000;
     
     DiskMultiMap m_toFromMap;
     DiskMultiMap m_fromToMap;
     DiskMultiMap m_prevalenceMap;
     
     unordered_map<std::string, int> m_prevCache;
-    
+
     int getCachedPrevalence(string entity);
     int prevalenceOf(std::string entity);
     void incrementPrevalence(std::string entity);

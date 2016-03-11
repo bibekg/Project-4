@@ -1,3 +1,5 @@
+#define _CRT_SECURE_NO_WARNINGS
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -6,19 +8,19 @@
 #include <unordered_set>
 #include <queue>
 #include <string>
+#include <cstring>
 
 #include "IntelWeb.h"
 #include "DiskMultiMap.h"
 
 using namespace std;
 
-IntelWeb::IntelWeb() {
-    
-}
+IntelWeb::IntelWeb() {}
 
 IntelWeb::~IntelWeb() {
     m_toFromMap.close();
     m_fromToMap.close();
+    m_prevalenceMap.close();
 }
 
 // BOR: O(maxDataItems), Actual: O(maxDataItems)
@@ -75,7 +77,8 @@ void IntelWeb::close() {
     m_prevalenceMap.close();
 }
 
-// BOR: O(lines in file), Actual: O(lines in file)
+// Assuming N is the total number of telemetry data lines
+// BOR: O(N), Actual: O(N)
 bool IntelWeb::ingest(const string& telemetryFile) {
     
     ifstream inf(telemetryFile);
@@ -86,23 +89,19 @@ bool IntelWeb::ingest(const string& telemetryFile) {
     }
     
     string line;
-    while (getline(inf, line)) {
+    while (getline(inf, line)) {                    // O(N)
         istringstream iss(line);
         string machine, to, from;
         
-        // Get the machine, to, and from strings from each line
         if (! (iss >> machine >> to >> from)) {
             cerr << "Ignoring badly-formatted input line: " << line << endl;
             continue;
         }
-        
-        // Insert entities into two maps:
-        //  • to -> from/machine
-        //  • from -> to/machine
+
         m_toFromMap.insert(to, from, machine);
         m_fromToMap.insert(from, to, machine);
         
-        // Log prevalence of each entity
+        // Log prevalence of each entity            // O(1)
         incrementPrevalence(to);
         incrementPrevalence(from);
     }
@@ -112,16 +111,16 @@ bool IntelWeb::ingest(const string& telemetryFile) {
 
 // Assuming T telemetry lines that refer to malicious entities
 // BOR: O(T) disk accesses & O(TlogT) operations involving in-memory data structures
-// Actual:
+// Actual: O(T) disk accesses, O(TlogT) 
 unsigned int IntelWeb::crawl(const vector<string>& indicators, unsigned int minPrevalenceToBeGood, vector<string>& badEntitiesFound, vector<InteractionTuple>& badInteractions) {
     
     unordered_set<string> badEntitySet;
     set<InteractionTuple> badInteractionSet;
     queue<string> maliciousQueue;
     
-    // Load queue with malicious indicators
-    for (int i = 0; i < indicators.size(); ++i) {                   // Runs in O(1) time
-        maliciousQueue.push(indicators[i]);                         // There aren't many indicators
+    // Load queue with malicious indicators                                 // Runs in O(1) time
+    for (int i = 0; i < indicators.size(); ++i) {
+        maliciousQueue.push(indicators[i]);
         
         // Insert indicators into badEntitySet only
         // if they are present in the telemetry data
@@ -129,10 +128,8 @@ unsigned int IntelWeb::crawl(const vector<string>& indicators, unsigned int minP
             badEntitySet.insert(indicators[i]);
     }
     
-    cout << "Started crawling" << endl;
-    
-    // While there are still malicious entities to check
-    while (!maliciousQueue.empty()) {                               // Runs in O(T) time
+    // While there are still malicious entities to check                    // Runs in O(T) time
+    while (!maliciousQueue.empty()) {
         string entity = maliciousQueue.front();
         maliciousQueue.pop();
         
@@ -142,10 +139,7 @@ unsigned int IntelWeb::crawl(const vector<string>& indicators, unsigned int minP
             MultiMapTuple m = *it;
             if(getCachedPrevalence(m.value) < minPrevalenceToBeGood && badEntitySet.insert(m.value).second)
                 maliciousQueue.push(m.value);                   // need to check against this entity later
-            
-            // The interaction is bad, regardless of the value (since key was malicious)
             badInteractionSet.insert(InteractionTuple(m.key, m.value, m.context));
-            
             ++it;
         }
         
@@ -155,15 +149,10 @@ unsigned int IntelWeb::crawl(const vector<string>& indicators, unsigned int minP
             MultiMapTuple m = *it;
             if(getCachedPrevalence(m.value) < minPrevalenceToBeGood && badEntitySet.insert(m.value).second)
                 maliciousQueue.push(m.value);                   // need to check against this entity later
-            
-            // The interaction is bad, regardless of the value (since key was malicious)
             badInteractionSet.insert(InteractionTuple(m.value, m.key, m.context));
-            
             ++it;
         }
     }
-    
-    cout << "Done crawling" << endl;
     
     // Empty the bad entity and interaction vectors
     badEntitiesFound.clear();
@@ -183,20 +172,21 @@ unsigned int IntelWeb::crawl(const vector<string>& indicators, unsigned int minP
         ++itBIS;
     }
 
-    sort(badEntitiesFound.begin(), badEntitiesFound.end());                 // Runs in O(TlogT)
-    sort(badInteractions.begin(), badInteractions.end());                   // Runs in O(TlogT)
+    std::sort(badEntitiesFound.begin(), badEntitiesFound.end());                 // Runs in O(TlogT)
+    std::sort(badInteractions.begin(), badInteractions.end());                   // Runs in O(TlogT)
     
     return int(badEntitiesFound.size());
 }
 
+// Assuming M items matching the string parameter
 // BOR: O(M), Actual: O(M)
-// M is the number of items matching the string parameter
 bool IntelWeb::purge(const string& entity) {
-
-    DiskMultiMap::Iterator it = m_fromToMap.search(entity);
+    bool didPurge = false;
     
-    // For every association in from-to with entity as the key
+    // For every association in the from-to map with entity as the key
+    DiskMultiMap::Iterator it = m_fromToMap.search(entity);
     while (it.isValid()) {
+        didPurge = true;
         MultiMapTuple m = *it;
         m_fromToMap.erase(m.key, m.value, m.context);   // erase from map1
         m_toFromMap.erase(m.value, m.key, m.context);   // erase from map2
@@ -205,10 +195,10 @@ bool IntelWeb::purge(const string& entity) {
         it = m_fromToMap.search(entity);
     }
     
+    // For every association in the to-from mapwith entity as the key
     it = m_toFromMap.search(entity);
-    
-    // For every association with entity as the key
     while (it.isValid()) {
+        didPurge = true;
         MultiMapTuple m = *it;
         m_toFromMap.erase(m.key, m.value, m.context);   // erase from map2
         m_fromToMap.erase(m.value, m.key, m.context);   // erase from map1
@@ -218,12 +208,22 @@ bool IntelWeb::purge(const string& entity) {
     }
     
     setPrevalenceZero(entity);
-    return true;
+    
+    // Clear cache upon purge since cached values are no longer correct
+    if (didPurge) m_prevCache.clear();
+    return didPurge;
 }
 
-// Private Functions
+// ----------------------------- //
+// ----- PRIVATE FUNCTIONS ----- //
+// ----------------------------- //
 
+// Big-O: O(1)
 int IntelWeb::getCachedPrevalence(string entity) {
+    
+    // Clear cache if it has grown too large
+    if (m_prevCache.size() > MAX_CACHE_SIZE)
+        m_prevCache.clear();
     
     // If the prevalence is cached, return the cached prevalence
     unordered_map<string, int>::iterator itPC = m_prevCache.find(entity);
@@ -253,6 +253,7 @@ int IntelWeb::getCachedPrevalence(string entity) {
     
 }
 
+// Big-O: O(1)
 int IntelWeb::prevalenceOf(string entity) {
     
     DiskMultiMap::Iterator it = m_prevalenceMap.search(entity);
@@ -264,38 +265,25 @@ int IntelWeb::prevalenceOf(string entity) {
         return stoi((*it).value);
 }
 
+// Big-O: O(1)
 void IntelWeb::incrementPrevalence(string entity) {
     int count = prevalenceOf(entity);
     m_prevalenceMap.erase(entity, to_string(count), "");
     m_prevalenceMap.insert(entity, to_string(count + 1), "");
-    
-//    unordered_map<string, int>::iterator itPC = m_prevCache.find(entity);
-//    m_prevCache.erase(itPC);
-//    std::pair<string, int> p (entity, count + 1);   // Cache the prevalence
-//    m_prevCache.insert(p);
 }
 
+// Big-O: O(1)
 void IntelWeb::decrementPrevalence(string entity) {
     int count = prevalenceOf(entity);
     m_prevalenceMap.erase(entity, to_string(count), "");
     m_prevalenceMap.insert(entity, to_string(count - 1), "");
-    
-//    unordered_map<string, int>::iterator itPC = m_prevCache.find(entity);
-//    m_prevCache.erase(itPC);
-//    std::pair<string, int> p (entity, count - 1);   // Cache the prevalence
-//    m_prevCache.insert(p);
 }
 
+// Big-O: O(1)
 void IntelWeb::setPrevalenceZero(string entity) {
     int count = prevalenceOf(entity);
     m_prevalenceMap.erase(entity, to_string(count), "");
     m_prevalenceMap.insert(entity, to_string(0), "");
-    
-//    unordered_map<string, int>::iterator itPC = m_prevCache.find(entity);
-//    m_prevCache.erase(itPC);
-//    std::pair<string, int> p (entity, 0);   // Cache the prevalence
-//    m_prevCache.insert(p);
-
 }
 
 bool operator<(const InteractionTuple& t1, const InteractionTuple& t2) {

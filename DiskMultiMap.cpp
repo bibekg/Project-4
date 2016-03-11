@@ -1,5 +1,8 @@
+#define _CRT_SECURE_NO_WARNINGS
+
 #include <functional>
 #include <string>
+#include <cstring>
 
 #include "DiskMultiMap.h"
 #include "BinaryFile.h"
@@ -38,6 +41,9 @@ bool DiskMultiMap::Iterator::isValid() const {
 
 DiskMultiMap::Iterator& DiskMultiMap::Iterator::operator++() {
     
+    if (!isValid())
+        return *this;
+    
     Association a, c;
     
     // Read next until you find a matching key or hit the end
@@ -48,9 +54,9 @@ DiskMultiMap::Iterator& DiskMultiMap::Iterator::operator++() {
         // Increment to next association
         m_curr = a.next;
         
-        //
+        // If we haven't run out of associations
         if (m_curr != NULL_SLOT) {
-            // Read the current association
+            // Check the current association if it's a correct one
             if (!m_map->m_file.read(c, m_curr)) cerr << "Failed to read from disk!" << endl;
             if (c.key == m_key)
                 break;
@@ -99,7 +105,6 @@ bool DiskMultiMap::createNew(const std::string& filename, unsigned int numBucket
     if(!m_file.createNew(filename))
         return false;   // return false if failed
     
-    m_filename = filename;
     m_totalBuckets = numBuckets;
     
     // Create hash table header
@@ -131,8 +136,6 @@ bool DiskMultiMap::openExisting(const std::string& filename) {
         cerr << "FAILED TO OPEN FILE FROM DISK!" << endl;
         return false;
     }
-
-    m_filename = filename;
     
     // Get total buckets count
     Header h;
@@ -146,7 +149,7 @@ void DiskMultiMap::close() {
     if (m_file.isOpen()) m_file.close();
 }
 
-// BOR: O(N/B), Actual: O(1)
+// BOR: O(N/B) or O(K), Actual: O(1)
 bool DiskMultiMap::insert(const std::string& key, const std::string& value, const std::string& context) {
     
     // Input is too long, return false immediately
@@ -168,23 +171,11 @@ bool DiskMultiMap::insert(const std::string& key, const std::string& value, cons
     if (reuseSlot(insertHere))
         oneSlotReused();
     
-    // Bucket is empty so far (adding first association)
-    if (!b.used) {
-        b.used = true;
-        a.next = NULL_SLOT;
-    
-        if (!m_file.write(a, insertHere)) cerr << "Failed to write to disk!" << endl;
-    }
-    
-    // Bucket already has an association
-    else {
-        a.next = b.head;  // set new association's next to bucket's current head
-        
-        if (!m_file.write(a, insertHere)) cerr << "Failed to write to disk!" << endl;;
-    }
-    
-    // Set the bucket's head to be newly inserted association
+    // Update the association and bucket pointers
+    a.next = b.head;
     b.head = insertHere;
+    b.used = true;
+    if (!m_file.write(a, insertHere)) cerr << "Failed to write to disk!" << endl;;
     if (!m_file.write(b, keyHasher(key))) cerr << "Failed to write to disk!" << endl;;
     
     return true;
@@ -194,20 +185,13 @@ bool DiskMultiMap::insert(const std::string& key, const std::string& value, cons
 // BOR: O(N/B) or O(K), Actual: O(K)
 DiskMultiMap::Iterator DiskMultiMap::search(const std::string& key) {
     
-    // Read the appropriate bucket from the hashing function
     Bucket b;
     if (!m_file.read(b, keyHasher(key))) cerr << "Failed to read from disk!" << endl;; // ERROR: Not finding the correct bucket
     
     if (b.used) {
-        // Create an iterator pointing to first association of that key
         DiskMultiMap::Iterator it(this, key);
-        
-        // Resulting iterator may be invalid if that bucket did not hold
-        // an association with the relevant key
         return it;
-    }
-    // The key does not exist, return an invalid iterator
-    else {
+    } else {
         DiskMultiMap::Iterator it;
         return it;
     }
@@ -217,9 +201,6 @@ DiskMultiMap::Iterator DiskMultiMap::search(const std::string& key) {
 // BOR: O(N/B) or O(K), Actual: O(K)
 int DiskMultiMap::erase(const std::string& key, const std::string& value, const std::string& context) {
     
-    // I want to erase every association that matches all three criterion: key, value, context.
-    
-    // Read the appropriate bucket from the hashing function
     Bucket b;
     if (!m_file.read(b, keyHasher(key))) cerr << "Failed to read from disk!" << endl;
     
@@ -241,8 +222,6 @@ int DiskMultiMap::erase(const std::string& key, const std::string& value, const 
 
             deletedCount++;
             deletedFirst = true;
-            
-            // Mark bucket's first association as a freed slot
             addToFreeSlotList(b.head);
             
             // Point bucket to second association (aka delete first node)
@@ -320,8 +299,6 @@ void DiskMultiMap::addToFreeSlotList(BinaryFile::Offset slot) {
         m_file.write(a, slot);
     }
     else {
-        // Push new empty slot to top of freeSlots list
-        
         // Set new slot's next to be current top empty slot
         Association a;
         if (!m_file.read(a, slot)) cerr << "Failed to read from disk!" << endl;
