@@ -121,9 +121,6 @@ unsigned int IntelWeb::crawl(const vector<string>& indicators, unsigned int minP
     // Load queue with malicious indicators                                 // Runs in O(1) time
     for (int i = 0; i < indicators.size(); ++i) {
         maliciousQueue.push(indicators[i]);
-        
-        // Insert indicators into badEntitySet only
-        // if they are present in the telemetry data
         if (prevalenceOf(indicators[i]) > 0)
             badEntitySet.insert(indicators[i]);
     }
@@ -255,7 +252,7 @@ int IntelWeb::getCachedPrevalence(string entity) {
 
 // Big-O: O(1)
 int IntelWeb::prevalenceOf(string entity) {
-    
+
     DiskMultiMap::Iterator it = m_prevalenceMap.search(entity);
     
     // Prevalence doesn't exist, consider it to be 0
@@ -287,9 +284,7 @@ void IntelWeb::setPrevalenceZero(string entity) {
 }
 
 bool operator<(const InteractionTuple& t1, const InteractionTuple& t2) {
-    
     // Sort by context, then from, then to
-    
     if (t1.context < t2.context) {
         return true;
     } else if (t1.context == t2.context) {
@@ -301,7 +296,5 @@ bool operator<(const InteractionTuple& t1, const InteractionTuple& t2) {
             }
         }
     }
-    
     return false;
-    
 }

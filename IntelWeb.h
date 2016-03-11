@@ -40,7 +40,4 @@ private:
     void decrementPrevalence(std::string entity);
     void setPrevalenceZero(std::string entity);
 };
-
-
 #endif // INTELWEB_H_
-                
